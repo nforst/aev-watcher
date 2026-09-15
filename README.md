@@ -2,10 +2,13 @@
 
 Überwacht die öffentliche Anfragenliste von
 [app-entwickler-verzeichnis.de](https://app-entwickler-verzeichnis.de/anfragen-app-programmierung)
-und schickt bei jeder neuen Projektanfrage eine WhatsApp-Nachricht über ein selbst
-gehostetes [OpenWA](https://github.com/rmyndharis/OpenWA)-Gateway.
+und schickt bei jeder neuen Projektanfrage eine WhatsApp-Nachricht.
 
-Node.js 20+, keine Runtime-Dependencies.
+**Kein zweiter Dienst nötig** – der WhatsApp-Client steckt über
+[Baileys](https://github.com/WhiskeySockets/Baileys) direkt in dieser App. Einmal
+per QR-Code koppeln, danach läuft alles in diesem einen Container.
+
+Node.js 20+.
 
 ## Funktionsweise
 
@@ -15,7 +18,7 @@ Node.js 20+, keine Runtime-Dependencies.
 3. Bereits gemeldete IDs stehen in der State-Datei. Alles, was dort nicht steht,
    ist neu und wird gemeldet.
 4. Eine Anfrage wird **erst nach erfolgreichem Versand** als gesehen markiert –
-   fällt das Gateway aus, geht die Nachricht im nächsten Durchlauf raus.
+   bricht die Verbindung weg, geht die Nachricht im nächsten Durchlauf raus.
 
 **Erster Lauf:** Die zum Startzeitpunkt gelisteten Anfragen werden ohne
 Benachrichtigung übernommen, damit es keine Flut alter Anfragen gibt. Mit
@@ -36,71 +39,67 @@ https://app-entwickler-verzeichnis.de/anfragen-app-programmierung/7959-Mobile+Pl
 
 ## Konfiguration
 
-Alles läuft über Umgebungsvariablen, siehe [`.env.example`](.env.example).
+Es gibt **keine Pflichtvariablen**. Ohne jede Konfiguration gehen die Nachrichten
+an dein eigenes WhatsApp-Konto. Siehe [`.env.example`](.env.example).
 
-| Variable | Pflicht | Default | Bedeutung |
-| --- | --- | --- | --- |
-| `OPENWA_BASE_URL` | ja | – | Basis-URL der OpenWA-Instanz, ohne Slash am Ende |
-| `OPENWA_API_KEY` | ja | – | API-Key aus dem OpenWA-Dashboard (`X-API-Key`) |
-| `OPENWA_SESSION_ID` | ja | – | **UUID** der Session, nicht der Session-Name |
-| `WHATSAPP_TO` | ja | – | Empfänger international, z. B. `+4915112345678`; `@c.us` wird ergänzt |
-| `STATE_FILE` | nein | `./data/state.json` | muss auf einem persistenten Volume liegen |
-| `INTERVAL_SECONDS` | nein | `300` | Intervall für `--watch`, Minimum 30 |
-| `MAX_MESSAGES_PER_RUN` | nein | `10` | Obergrenze pro Lauf, der Rest folgt im nächsten |
-| `NOTIFY_ON_FIRST_RUN` | nein | `false` | beim ersten Lauf über alle gelisteten Anfragen melden |
-
-Die Session-UUID findest du im OpenWA-Dashboard bzw. über
-`GET {OPENWA_BASE_URL}/api/sessions` mit deinem API-Key.
+| Variable | Default | Bedeutung |
+| --- | --- | --- |
+| `WHATSAPP_TO` | `self` | `self` = an dich selbst; sonst Nummer international (`+4915112345678`) oder Gruppen-ID (`...@g.us`) |
+| `STATE_FILE` | `./data/state.json` | gemeldete Anfragen; auf persistentes Volume legen |
+| `WA_AUTH_DIR` | `./data/wa-auth` | WhatsApp-Kopplung; auf persistentes Volume legen |
+| `INTERVAL_SECONDS` | `300` | Prüfintervall, Minimum 30 |
+| `MAX_MESSAGES_PER_RUN` | `10` | Obergrenze pro Lauf, der Rest folgt im nächsten |
+| `NOTIFY_ON_FIRST_RUN` | `false` | beim ersten Lauf über alle gelisteten Anfragen melden |
 
 ## Kommandos
 
 ```bash
-node src/index.js                 # einmalig prüfen und beenden (für Cron/Scheduler)
-node src/index.js --watch         # dauerhaft laufen, alle INTERVAL_SECONDS prüfen
-node src/index.js --dry-run       # prüfen und Nachrichten nur ausgeben, nichts senden/speichern
-node src/index.js --test-message  # Testnachricht senden, um die Konfiguration zu prüfen
+node src/index.js                 # Dienst: verbinden, Verbindung halten, im Intervall prüfen
+node src/index.js --login         # nur koppeln: QR-Code anzeigen und Sitzung speichern
+node src/index.js --once          # einmalig prüfen, senden, beenden
+node src/index.js --dry-run       # nur prüfen und Nachrichten ausgeben, ohne WhatsApp
+node src/index.js --test-message  # Testnachricht senden
+node src/index.js --logout        # gespeicherte Sitzung löschen (danach neu koppeln)
 npm test                          # Parser-Tests gegen ein gespeichertes Seiten-Snapshot
 ```
 
-`--dry-run` braucht keine OpenWA-Zugangsdaten und eignet sich zum schnellen Prüfen,
-ob der Parser noch zur Seitenstruktur passt.
+`--dry-run` baut gar keine WhatsApp-Verbindung auf und eignet sich zum schnellen
+Prüfen, ob der Parser noch zur Seitenstruktur passt. `--once` verbindet sich nur
+dann, wenn es tatsächlich etwas zu senden gibt.
+
+## Erste Einrichtung
+
+```bash
+npm install
+node src/index.js --login     # QR-Code mit dem Handy scannen
+node src/index.js --test-message
+node src/index.js             # Dienst starten
+```
+
+Koppeln geht wie bei WhatsApp Web: **WhatsApp auf dem Handy → Einstellungen →
+Verknüpfte Geräte → Gerät verknüpfen**, dann den QR-Code im Terminal scannen.
+Die Sitzung liegt danach in `WA_AUTH_DIR` und bleibt gültig, bis du das Gerät im
+Handy wieder trennst.
 
 ## Deployment auf Coolify
 
-Repo in Coolify als **Docker Compose**- oder **Dockerfile**-Anwendung anlegen, die
-vier Pflicht-Variablen als Environment Variables setzen und ein persistentes Volume
-auf `/app/data` legen. Ohne dieses Volume ist der State nach jedem Deploy weg und
-der nächste Lauf startet wieder als Erstlauf.
+Repo als **Docker Compose**- oder **Dockerfile**-Anwendung anlegen und ein
+persistentes Volume auf `/app/data` legen. Ohne dieses Volume ist nach jedem
+Deploy die Kopplung weg und du musst neu scannen.
 
-**Variante A – Container prüft selbst (Standard, kein Scheduler nötig)**
+Der Container ist ein **Dauerläufer**, kein Scheduler-Job: er hält die
+WhatsApp-Verbindung offen und prüft selbst alle `INTERVAL_SECONDS`. Ein
+Coolify Scheduled Task ist damit nicht nötig – und wäre hier auch unpraktisch,
+weil jeder Lauf die WhatsApp-Sitzung neu aufbauen müsste.
 
-Nichts weiter zu tun: das Image startet `node src/index.js --watch` und prüft alle
-`INTERVAL_SECONDS`.
+**Koppeln nach dem ersten Deploy:**
 
-**Variante B – Coolify Scheduled Task**
+1. Anwendung starten und die Container-Logs in Coolify öffnen.
+2. Dort erscheint der QR-Code als ASCII-Grafik – mit dem Handy scannen.
+3. Im Log erscheint `WhatsApp verbunden als ...`. Fertig.
 
-Coolify führt geplante Tasks in dem *laufenden* Container aus, der Container muss
-also am Leben bleiben. Dafür:
-
-1. Container-Command auf `sleep infinity` setzen (in `docker-compose.yml` ist die
-   Zeile dafür vorbereitet).
-2. Scheduled Task anlegen:
-   - Command: `node /app/src/index.js`
-   - Frequency: z. B. `*/5 * * * *`
-
-Nach dem ersten Deploy einmal `node /app/src/index.js --test-message` im Container
-ausführen – kommt die Nachricht an, stimmen Gateway, Session und Nummer.
-
-## Lokal ausprobieren
-
-```bash
-cd aev-watcher
-node src/index.js --dry-run
-
-set -a && source .env && set +a
-node src/index.js --test-message
-node src/index.js --watch
-```
+Wird nicht innerhalb von zwei Minuten gescannt, bricht der Start ab und Coolify
+startet den Container neu – dann erscheint einfach ein frischer QR-Code.
 
 ## Grenzen
 
@@ -110,6 +109,10 @@ node src/index.js --watch
 - Der Parser hängt am HTML der Listenseite. Ändert die Seite ihre Struktur, bricht
   der Lauf mit einer klaren Fehlermeldung ab, statt still nichts mehr zu melden.
   `npm test` und `--dry-run` zeigen das sofort.
-- OpenWA ist ein inoffizielles Gateway auf Basis eines normalen WhatsApp-Kontos.
-  Das ist für private Benachrichtigungen praktisch, entspricht aber nicht den
-  offiziellen WhatsApp-Business-Bedingungen.
+- Baileys spricht das WhatsApp-Web-Protokoll mit deinem normalen Konto. Das ist für
+  private Benachrichtigungen praktisch, ist aber kein offizieller WhatsApp-Zugang:
+  Es entspricht nicht den WhatsApp-Geschäftsbedingungen, und WhatsApp kann solche
+  Verbindungen jederzeit unterbinden. Für rein persönliche Benachrichtigungen in
+  diesem Volumen ist das Risiko gering, aber es ist nicht null.
+- Meldet WhatsApp die Sitzung ab (Gerät im Handy getrennt), beendet sich der Dienst
+  mit einer Fehlermeldung. Dann `--logout` und neu koppeln.

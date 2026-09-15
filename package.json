@@ -1,7 +1,7 @@
 {
   "name": "aev-watcher",
-  "version": "1.0.0",
-  "description": "Ueberwacht app-entwickler-verzeichnis.de auf neue Projektanfragen und benachrichtigt per WhatsApp (OpenWA)",
+  "version": "2.0.0",
+  "description": "Ueberwacht app-entwickler-verzeichnis.de auf neue Projektanfragen und benachrichtigt per WhatsApp",
   "type": "module",
   "private": true,
   "engines": {
@@ -12,9 +12,15 @@
   },
   "scripts": {
     "start": "node src/index.js",
-    "watch": "node src/index.js --watch",
+    "login": "node src/index.js --login",
+    "once": "node src/index.js --once",
     "dry-run": "node src/index.js --dry-run",
     "test-message": "node src/index.js --test-message",
+    "logout": "node src/index.js --logout",
     "test": "node --test \"test/**/*.test.js\""
+  },
+  "dependencies": {
+    "baileys": "7.0.0-rc14",
+    "qrcode-terminal": "^0.12.0"
   }
 }

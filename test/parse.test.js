@@ -3,9 +3,9 @@ import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { toChatId } from '../src/config.js';
-import { formatMessage } from '../src/notify.js';
+import { formatMessage } from '../src/message.js';
 import { parseAnfragen } from '../src/scraper.js';
+import { WhatsAppClient } from '../src/whatsapp.js';
 
 const BASE_URL = 'https://app-entwickler-verzeichnis.de';
 const fixture = await readFile(fileURLToPath(new URL('./fixtures/listing.html', import.meta.url)), 'utf8');
@@ -62,10 +62,17 @@ test('kuerzt zu lange Nachrichten auf das WhatsApp-Limit', () => {
   assert.ok(message.endsWith('…'));
 });
 
-test('normalisiert Telefonnummern zur chatId', () => {
-  assert.equal(toChatId('+49 151 12345678'), '4915112345678@c.us');
-  assert.equal(toChatId('0049151123456'), '49151123456@c.us');
-  assert.equal(toChatId('49151123456@c.us'), '49151123456@c.us');
-  assert.throws(() => toChatId('0151123456'), /Laendervorwahl/);
-  assert.throws(() => toChatId(''), /nicht gesetzt/);
+test('normalisiert Telefonnummern zur WhatsApp-JID', () => {
+  const client = new WhatsAppClient({ authDir: '/tmp/aev-watcher-test' }, () => {});
+
+  assert.equal(client.resolveJid('+49 151 12345678'), '4915112345678@s.whatsapp.net');
+  assert.equal(client.resolveJid('0049151123456'), '49151123456@s.whatsapp.net');
+  assert.equal(client.resolveJid('49151123456@s.whatsapp.net'), '49151123456@s.whatsapp.net');
+  assert.equal(client.resolveJid('49151123456@c.us'), '49151123456@s.whatsapp.net');
+  assert.equal(client.resolveJid('120363000000000000@g.us'), '120363000000000000@g.us');
+
+  assert.throws(() => client.resolveJid('0151123456'), /Laendervorwahl/);
+  assert.throws(() => client.resolveJid('123'), /gueltigen Nummer/);
+  // "self" laesst sich erst nach dem Verbinden aufloesen.
+  assert.throws(() => client.resolveJid('self'), /erst verbinden/);
 });

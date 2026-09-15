@@ -3,21 +3,17 @@ services:
     build: .
     restart: unless-stopped
     environment:
-      OPENWA_BASE_URL: ${OPENWA_BASE_URL}
-      OPENWA_API_KEY: ${OPENWA_API_KEY}
-      OPENWA_SESSION_ID: ${OPENWA_SESSION_ID}
-      WHATSAPP_TO: ${WHATSAPP_TO}
+      # Leer lassen bzw. "self" = Nachricht an das eigene Konto.
+      WHATSAPP_TO: ${WHATSAPP_TO:-self}
       STATE_FILE: /app/data/state.json
+      WA_AUTH_DIR: /app/data/wa-auth
       INTERVAL_SECONDS: ${INTERVAL_SECONDS:-300}
       MAX_MESSAGES_PER_RUN: ${MAX_MESSAGES_PER_RUN:-10}
       NOTIFY_ON_FIRST_RUN: ${NOTIFY_ON_FIRST_RUN:-false}
     volumes:
-      - aev-state:/app/data
-    # Variante A (Standard): der Container prueft selbst im Intervall.
-    # Variante B (Coolify Scheduled Task): naechste Zeile einkommentieren,
-    # dann haelt der Container nur still und der Scheduler ruft
-    # `node /app/src/index.js` auf.
-    # command: ["sleep", "infinity"]
+      # Enthaelt die WhatsApp-Kopplung und den Zustand. Ohne dieses Volume
+      # muesstest du nach jedem Deploy neu koppeln.
+      - aev-data:/app/data
 
 volumes:
-  aev-state:
+  aev-data:
