@@ -1,0 +1,11 @@
+node_modules/
+data/
+test/
+.env
+.env.local
+.git/
+.gitignore
+*.log
+.DS_Store
+README.md
+docker-compose.yml
