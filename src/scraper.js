@@ -36,12 +36,38 @@ function pick(row, regex, group = 1) {
   return match ? match[group] : null;
 }
 
-function parseDate(block) {
+const MONTH_NAMES = {
+  JAN: 'Januar',
+  FEB: 'Februar',
+  'MÄR': 'März',
+  MRZ: 'März',
+  APR: 'April',
+  MAI: 'Mai',
+  JUN: 'Juni',
+  JUL: 'Juli',
+  AUG: 'August',
+  SEP: 'September',
+  OKT: 'Oktober',
+  NOV: 'November',
+  DEZ: 'Dezember',
+};
+
+/**
+ * Baut aus den drei Datums-Spans ein lesbares Datum: "24. Oktober 2026".
+ * Das Jahr steht nur dann in der Tabelle, wenn es nicht das laufende Jahr ist.
+ */
+function parseDate(block, now = new Date()) {
   if (!block) return null;
   const day = pick(block, /class="date day">\s*([^<]*?)\s*</);
   const month = pick(block, /class="date month">\s*([^<]*?)\s*</);
   if (!day || !month) return null;
-  return `${day} ${month}`;
+
+  const year = pick(block, /class="date year">\s*(\d{4})\s*</) ?? String(now.getFullYear());
+  const monthName = MONTH_NAMES[decodeEntities(month).toUpperCase()];
+
+  // Unbekanntes Monatskuerzel lieber roh durchreichen als etwas Falsches anzeigen.
+  if (!monthName) return `${day} ${month} ${year}`;
+  return `${Number(day)}. ${monthName} ${year}`;
 }
 
 /**
@@ -80,7 +106,9 @@ export function parseAnfragen(html, baseUrl) {
       id,
       slug,
       title,
-      url: `${baseUrl}/anfragen-app-programmierung/${slug}`,
+      // Die "schoene" URL /anfragen-app-programmierung/<slug> antwortet mit HTTP 500,
+      // nur die index.php-Form funktioniert.
+      url: `${baseUrl}/index.php?com=anfragen&view=detail&id=${id}`,
       date: parseDate(dateBlocks[0]),
       deadline: parseDate(dateBlocks[1]),
       type: pick(row, /<i\s+class=['"]icon icon-[^'"]*['"]\s+title=['"]([^'"]*)['"]/i),

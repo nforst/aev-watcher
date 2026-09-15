@@ -28,14 +28,17 @@ Benachrichtigung übernommen, damit es keine Flut alter Anfragen gibt. Mit
 
 ```
 *Neue Anfrage: Mobile Player*
-19 AUG · Firmenanfrage
-Budget: €12.000 · OS: iOS (iPhone/iPad), Android · Frist: 31 AUG
+19. August 2026 · Firmenanfrage
+Budget: €12.000 · OS: iOS (iPhone/iPad), Android · Frist: 31. August 2026
 
 Ich suche eine erfahrene Flutter-Entwicklerin / einen erfahrenen Flutter-Entwickler
 für die Umsetzung einer Android-App (Mobile Player für Fitness-Trainer)...
 
-https://app-entwickler-verzeichnis.de/anfragen-app-programmierung/7959-Mobile+Player
+https://app-entwickler-verzeichnis.de/index.php?com=anfragen&view=detail&id=7959
 ```
+
+Das Jahr steht in der Tabelle nur dann, wenn es **nicht** das laufende Jahr ist –
+fehlt es, wird das aktuelle Jahr angenommen.
 
 ## Konfiguration
 

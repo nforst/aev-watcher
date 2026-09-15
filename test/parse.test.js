@@ -10,6 +10,8 @@ import { WhatsAppClient } from '../src/whatsapp.js';
 const BASE_URL = 'https://app-entwickler-verzeichnis.de';
 const fixture = await readFile(fileURLToPath(new URL('./fixtures/listing.html', import.meta.url)), 'utf8');
 const items = parseAnfragen(fixture, BASE_URL);
+// Ohne Jahres-Span gilt das laufende Jahr - der Test muss das mitziehen.
+const YEAR = new Date().getFullYear();
 
 test('findet alle Anfragen-Zeilen', () => {
   assert.equal(items.length, 9);
@@ -22,25 +24,40 @@ test('findet alle Anfragen-Zeilen', () => {
 test('liest alle Felder einer Zeile', () => {
   const item = items.find((entry) => entry.id === 7959);
   assert.equal(item.title, 'Mobile Player');
-  assert.equal(item.date, '19 AUG');
-  assert.equal(item.deadline, '31 AUG');
+  assert.equal(item.date, `19. August ${YEAR}`);
+  assert.equal(item.deadline, `31. August ${YEAR}`);
   assert.equal(item.type, 'Firmenanfrage');
   assert.equal(item.budget, '€12.000');
   assert.deepEqual(item.os, ['iOS (iPhone/iPad)', 'Android']);
   assert.match(item.teaser, /^Ich suche eine erfahrene Flutter-Entwicklerin/);
-  assert.equal(item.url, `${BASE_URL}/anfragen-app-programmierung/7959-Mobile+Player`);
+  // Die "schoene" URL liefert HTTP 500, daher die index.php-Form.
+  assert.equal(item.url, `${BASE_URL}/index.php?com=anfragen&view=detail&id=7959`);
 });
 
-test('dekodiert Umlaute in Titel und URL', () => {
+test('dekodiert Umlaute im Titel', () => {
   const item = items.find((entry) => entry.id === 7789);
   assert.equal(item.title, 'APP für Taxi- und Courierdienstleister');
-  assert.ok(item.url.includes('f%C3%BCr'));
+});
+
+test('schreibt Monate aus und laesst die fuehrende Null weg', () => {
+  assert.equal(items.find((entry) => entry.id === 7778).date, `2. April ${YEAR}`);
+  assert.equal(items.find((entry) => entry.id === 7813).date, `19. März ${YEAR}`);
+  assert.equal(items.find((entry) => entry.id === 7853).date, `24. Oktober ${YEAR}`);
+});
+
+test('nimmt das Jahr aus der Tabelle, wenn es dort steht', () => {
+  const html = `<tr id='row42'>
+      <td class="date"><span class="date day">02</span><span class="date month">JAN</span><span class="date year">2024</span></td>
+      <td><a href='index.php?com=anfragen&view=detail&id=42-Alt'>Alt</a></td>
+    </tr>`;
+  const [item] = parseAnfragen(html, BASE_URL);
+  assert.equal(item.date, '2. Januar 2024');
 });
 
 test('kommt mit fehlender Frist klar', () => {
   const item = items.find((entry) => entry.id === 7956);
   assert.equal(item.deadline, null);
-  assert.equal(item.date, '30 JUL');
+  assert.equal(item.date, `30. Juli ${YEAR}`);
 });
 
 test('gibt bei fremdem HTML keine Treffer zurueck', () => {
@@ -50,9 +67,12 @@ test('gibt bei fremdem HTML keine Treffer zurueck', () => {
 test('formatiert eine WhatsApp-Nachricht mit allen Angaben', () => {
   const message = formatMessage(items.find((entry) => entry.id === 7959));
   assert.match(message, /\*Neue Anfrage: Mobile Player\*/);
-  assert.match(message, /19 AUG · Firmenanfrage/);
-  assert.match(message, /Budget: €12\.000 · OS: iOS \(iPhone\/iPad\), Android · Frist: 31 AUG/);
-  assert.match(message, /7959-Mobile\+Player$/);
+  assert.match(message, new RegExp(`19\\. August ${YEAR} · Firmenanfrage`));
+  assert.match(
+    message,
+    new RegExp(`Budget: €12\\.000 · OS: iOS \\(iPhone/iPad\\), Android · Frist: 31\\. August ${YEAR}`),
+  );
+  assert.match(message, /id=7959$/);
   assert.ok(message.length <= 4096);
 });
 
